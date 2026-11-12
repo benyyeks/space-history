@@ -1,11 +1,13 @@
-import { Suspense, useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Suspense, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, Stars } from "@react-three/drei";
 import * as THREE from "three";
 import type { Mission } from "@/data/missions";
 import { latLonToVec3 } from "@/data/missions";
 
 const GLOBE_R = 2;
+// Hide name tags when the camera is closer than this (world units from origin)
+const LABEL_HIDE_DISTANCE = 3.6;
 
 type PlanetGlobeProps = {
   hub: "mars" | "lunar";
@@ -20,8 +22,6 @@ function GlobeMesh({ hub }: { hub: "mars" | "lunar" }) {
   const color = hub === "mars" ? "#8B3A1A" : "#9CA3AF";
   const emissive = hub === "mars" ? "#3d1a0a" : "#1f2937";
 
-  // Procedural surface look so the app runs without large texture files.
-  // Drop real USGS / NASA maps into public/textures later if you want.
   return (
     <group>
       <mesh>
@@ -52,10 +52,12 @@ function MissionMarker({
   mission,
   selected,
   onSelect,
+  hideLabels,
 }: {
   mission: Mission;
   selected: boolean;
   onSelect: () => void;
+  hideLabels: boolean;
 }) {
   const pos = useMemo(
     () => latLonToVec3(mission.lat, mission.lon, GLOBE_R * 1.02),
@@ -71,13 +73,16 @@ function MissionMarker({
     mat.opacity = 0.7 * (1 - t);
   });
 
+  const pick = (e: any) => {
+    e.stopPropagation();
+    onSelect();
+  };
+
   return (
     <group position={pos}>
+      {/* Large invisible hit target so clicks are easy */}
       <mesh
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect();
-        }}
+        onClick={pick}
         onPointerOver={() => {
           document.body.style.cursor = "pointer";
         }}
@@ -85,11 +90,18 @@ function MissionMarker({
           document.body.style.cursor = "auto";
         }}
       >
-        <sphereGeometry args={[selected ? 0.07 : 0.05, 16, 16]} />
+        <sphereGeometry args={[0.22, 16, 16]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Visible marker */}
+      <mesh onClick={pick}>
+        <sphereGeometry args={[selected ? 0.08 : 0.06, 16, 16]} />
         <meshBasicMaterial color={mission.accent} />
       </mesh>
-      <mesh ref={pulse}>
-        <ringGeometry args={[0.06, 0.09, 24]} />
+
+      <mesh ref={pulse} onClick={pick}>
+        <ringGeometry args={[0.07, 0.11, 24]} />
         <meshBasicMaterial
           color={mission.accent}
           transparent
@@ -98,11 +110,31 @@ function MissionMarker({
           depthWrite={false}
         />
       </mesh>
-      <Html center distanceFactor={8} style={{ pointerEvents: "none" }}>
-        <div className="marker-label">{mission.name}</div>
-      </Html>
+
+      {/* Labels only when zoomed out */}
+      {!hideLabels && (
+        <Html center distanceFactor={10} style={{ pointerEvents: "none" }}>
+          <div className="marker-label">{mission.name}</div>
+        </Html>
+      )}
     </group>
   );
+}
+
+function LabelVisibility({
+  focusing,
+  onChange,
+}: {
+  focusing: boolean;
+  onChange: (hide: boolean) => void;
+}) {
+  const { camera } = useThree();
+  useFrame(() => {
+    const dist = camera.position.length();
+    const hide = focusing || dist < LABEL_HIDE_DISTANCE;
+    onChange(hide);
+  });
+  return null;
 }
 
 function CameraFocus({
@@ -113,7 +145,6 @@ function CameraFocus({
   onDone?: () => void;
 }) {
   const done = useRef(false);
-  const controlsRef = useRef<any>(null);
 
   useFrame(({ camera }) => {
     if (!mission || done.current) return;
@@ -129,14 +160,8 @@ function CameraFocus({
     }
   });
 
-  // reset done flag when mission changes
-  if (mission) {
-    // noop: ref tracks completion per focus session via parent remount key
-  }
-
   return (
     <OrbitControls
-      ref={controlsRef}
       enablePan={false}
       minDistance={2.4}
       maxDistance={8}
@@ -157,6 +182,7 @@ export function PlanetGlobe({
   onZoomComplete,
 }: PlanetGlobeProps) {
   const focusMission = missions.find((m) => m.id === focusMissionId) ?? null;
+  const [hideLabels, setHideLabels] = useState(false);
 
   return (
     <Canvas
@@ -172,12 +198,17 @@ export function PlanetGlobe({
       <Suspense fallback={null}>
         <GlobeMesh hub={hub} />
       </Suspense>
+      <LabelVisibility
+        focusing={!!focusMissionId}
+        onChange={setHideLabels}
+      />
       {missions.map((m) => (
         <MissionMarker
           key={m.id}
           mission={m}
           selected={selectedId === m.id}
           onSelect={() => onSelect(m.id)}
+          hideLabels={hideLabels}
         />
       ))}
       <CameraFocus
