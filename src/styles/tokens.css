@@ -1,0 +1,70 @@
+/* Design tokens: glassmorphism + auto light/dark via prefers-color-scheme */
+
+:root {
+  /* Landing (Blend) */
+  --bg-deep: #0b0f19;
+  --bg-soft: #f3f4f6;
+  --accent-rust: #c1440e;
+  --accent-silver: #e5e7eb;
+
+  /* Mars */
+  --mars-orange: #e77d11;
+  --mars-surface: #3d1f0f;
+
+  /* Lunar */
+  --lunar-white: #ffffff;
+  --lunar-gray: #374151;
+  --lunar-surface: #1a1c20;
+
+  /* Shared glass */
+  --glass-bg: rgba(15, 20, 32, 0.55);
+  --glass-border: rgba(229, 231, 235, 0.12);
+  --glass-blur: 18px;
+  --text-primary: #f3f4f6;
+  --text-muted: #9ca3af;
+  --text-accent: var(--accent-rust);
+
+  --font-display: "Space Mono", ui-monospace, monospace;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  color-scheme: dark;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(55, 65, 81, 0.14);
+    --text-primary: #111827;
+    --text-muted: #4b5563;
+    --text-accent: var(--accent-rust);
+    --shadow-glass: 0 8px 28px rgba(0, 0, 0, 0.08);
+
+    color-scheme: light;
+    background-color: var(--bg-soft);
+  }
+}
+
+/* Hub theme overrides (applied on hub wrappers) */
+.theme-mars {
+  --text-accent: var(--mars-orange);
+  --hub-glow: rgba(231, 125, 17, 0.35);
+}
+
+.theme-lunar {
+  --text-accent: var(--lunar-white);
+  --hub-glow: rgba(255, 255, 255, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+  .theme-lunar {
+    --text-accent: var(--lunar-gray);
+  }
+}
